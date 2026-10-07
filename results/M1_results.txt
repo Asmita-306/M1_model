@@ -1,0 +1,20 @@
+M1 — Patch-based CNN
+
+Dataset: UWIQA
+
+Train: 70%
+Validation: 15%
+Test: 15%
+
+Input: 256 × 256
+Patches: 4
+Patch size: 128 × 128
+
+Loss: MSE
+Optimizer: Adam
+Learning rate: 0.001
+
+PLCC:0.5296
+SRCC:0.5477
+KRCC:0.4168
+RMSE:0.1217
