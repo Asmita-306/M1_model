@@ -1,24 +1,39 @@
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
+from m2 import M2
 from m1_dataset import M1UWIQADataset
-from m1 import M1
 
 
 # ---------------------------------------
-# Device
+# Settings
 # ---------------------------------------
+
+SEED = 42
+BATCH_SIZE = 8
+LEARNING_RATE = 0.001
+NUM_EPOCHS = 2
+ITERATIONS_PER_EPOCH = 10
 
 device = torch.device(
     "cuda" if torch.cuda.is_available() else "cpu"
 )
 
-print("Using device:", device)
+
+# ---------------------------------------
+# Reproducibility
+# ---------------------------------------
+
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 
 
 # ---------------------------------------
-# Datasets
+# Dataset
 # ---------------------------------------
 
 train_dataset = M1UWIQADataset(
@@ -33,104 +48,86 @@ val_dataset = M1UWIQADataset(
 
 
 # ---------------------------------------
-# DataLoaders
+# DataLoader
 # ---------------------------------------
 
 train_loader = DataLoader(
     train_dataset,
-    batch_size=8,
+    batch_size=BATCH_SIZE,
     shuffle=True,
     num_workers=0
 )
 
 val_loader = DataLoader(
     val_dataset,
-    batch_size=8,
+    batch_size=BATCH_SIZE,
     shuffle=False,
     num_workers=0
 )
 
 
 # ---------------------------------------
-# Model
+# M2 model
 # ---------------------------------------
 
-model = M1().to(device)
-
-
-# ---------------------------------------
-# Loss
-# ---------------------------------------
+model = M2().to(device)
 
 criterion = nn.MSELoss()
 
-
-# ---------------------------------------
-# Optimizer
-# ---------------------------------------
-
 optimizer = torch.optim.Adam(
     model.parameters(),
-    lr=0.001
+    lr=LEARNING_RATE
 )
 
 
 # ---------------------------------------
-# Training settings
+# Training
 # ---------------------------------------
-
-num_epochs = 20
 
 best_val_loss = float("inf")
 
-
-# ---------------------------------------
-# Training loop
-# ---------------------------------------
-
-for epoch in range(num_epochs):
-
-    # -------------------------------
-    # TRAIN
-    # -------------------------------
+for epoch in range(NUM_EPOCHS):
 
     model.train()
 
     train_loss = 0.0
 
-    for patches, scores in train_loader:
+    train_iterator = iter(train_loader)
 
-        # Move data to device
+    for iteration in range(ITERATIONS_PER_EPOCH):
+
+        try:
+            patches, scores = next(train_iterator)
+
+        except StopIteration:
+            train_iterator = iter(train_loader)
+            patches, scores = next(train_iterator)
+
         patches = patches.to(device)
         scores = scores.to(device)
 
-        # Clear gradients
         optimizer.zero_grad()
 
-        # Forward pass
         predictions = model(patches)
 
-        # Calculate loss
         loss = criterion(
             predictions,
             scores
         )
 
-        # Backpropagation
         loss.backward()
-
-        # Update weights
         optimizer.step()
 
-        # Accumulate loss
         train_loss += loss.item()
 
-    train_loss /= len(train_loader)
+    average_train_loss = (
+        train_loss / ITERATIONS_PER_EPOCH
+    )
 
 
-    # -------------------------------
-    # VALIDATION
-    # -------------------------------
+    # ---------------------------------------
+    # Validation
+    # ---------------------------------------
 
     model.eval()
 
@@ -152,35 +149,31 @@ for epoch in range(num_epochs):
 
             val_loss += loss.item()
 
-    val_loss /= len(val_loader)
-
-
-    # -------------------------------
-    # Print results
-    # -------------------------------
-
-    print(
-        f"Epoch [{epoch + 1}/{num_epochs}] "
-        f"Train Loss: {train_loss:.4f} "
-        f"Val Loss: {val_loss:.4f}"
+    average_val_loss = (
+        val_loss / len(val_loader)
     )
 
 
-    # -------------------------------
+    print(
+        f"Epoch [{epoch + 1}/{NUM_EPOCHS}] "
+        f"Train Loss: {average_train_loss:.4f} "
+        f"Val Loss: {average_val_loss:.4f}"
+    )
+
+
+    # ---------------------------------------
     # Save best model
-    # -------------------------------
+    # ---------------------------------------
 
-    if val_loss < best_val_loss:
+    if average_val_loss < best_val_loss:
 
-        best_val_loss = val_loss
+        best_val_loss = average_val_loss
 
         torch.save(
             model.state_dict(),
-            "m1_best.pth"
+            "m2_2x10_best.pth"
         )
 
-        print("  → Best model saved!")
 
-
-print("\nTraining completed!")
-print("Best validation loss:", best_val_loss)
+print("\nTraining complete.")
+print(f"Best validation loss: {best_val_loss:.4f}")

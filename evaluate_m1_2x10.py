@@ -45,7 +45,7 @@ model = M1().to(device)
 
 model.load_state_dict(
     torch.load(
-        "m1_best.pth",
+        "m1_2x10_best.pth",
         map_location=device
     )
 )
